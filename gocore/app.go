@@ -15,6 +15,7 @@ type AppOptions struct {
 	Logger              *zap.Logger
 	DisableGlobalLogger bool
 	DisableMigrations   bool
+	DBTablePrefix       string
 }
 
 type AppConfig struct {
@@ -78,7 +79,7 @@ func NewApp(appName string, config AppConfig, migrations []dbcore.Migration) (*A
 	}
 	var migrator *dbcore.Migrator
 	if !config.Options.DisableMigrations {
-		migrator = dbcore.NewMigrator(postgres.GormDB(), config.Options.Logger, appName, migrations)
+		migrator = dbcore.NewMigrator(postgres.GormDB(), config.Options.Logger, config.Options.DBTablePrefix, migrations)
 		if err := migrator.Run(); err != nil {
 			return nil, err
 		}

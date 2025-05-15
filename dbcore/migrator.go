@@ -3,6 +3,7 @@ package dbcore
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -32,22 +33,28 @@ type MigrationRecord struct {
 type Migrator struct {
 	DB          *gorm.DB
 	Logger      *zap.Logger
-	ServiceName string
+	TablePrefix string
 	Migrations  []Migration
 }
 
 // New создает новый менеджер миграций для сервиса
-func NewMigrator(db *gorm.DB, logger *zap.Logger, serviceName string, migrations []Migration) *Migrator {
+func NewMigrator(db *gorm.DB, logger *zap.Logger, tablePrefix string, migrations []Migration) *Migrator {
+	// remove spaces from serviceName
+	tablePrefix = strings.ReplaceAll(tablePrefix, " ", "_")
+	tablePrefix = strings.ToLower(tablePrefix)
 	return &Migrator{
 		DB:          db,
 		Logger:      logger,
-		ServiceName: serviceName,
+		TablePrefix: tablePrefix,
 		Migrations:  migrations,
 	}
 }
 
 func (m *Migrator) TableName() string {
-	return fmt.Sprintf("%s_migrations", m.ServiceName)
+	if m.TablePrefix == "" {
+		return "migrations"
+	}
+	return fmt.Sprintf("%s_migrations", m.TablePrefix)
 }
 
 func (m *Migrator) AddMigration(description string, up MigrationFunc, down MigrationFunc) {
@@ -101,14 +108,14 @@ func (m *Migrator) Run() error {
 		// Если миграция уже применена, пропускаем
 		if applied, exists := appliedVersions[migration.Version]; exists && applied {
 			m.Logger.Debug("Migration already applied",
-				zap.String("service", m.ServiceName),
+				zap.String("table_prefix", m.TablePrefix),
 				zap.Int("version", migration.Version),
 				zap.Bool("applied", applied))
 			continue
 		}
 
 		m.Logger.Info("Applying migration",
-			zap.String("service", m.ServiceName),
+			zap.String("table_prefix", m.TablePrefix),
 			zap.Int("version", migration.Version),
 			zap.String("description", migration.Description))
 
@@ -131,7 +138,7 @@ func (m *Migrator) Run() error {
 		}
 
 		m.Logger.Info("Migration applied successfully",
-			zap.String("service", m.ServiceName),
+			zap.String("table_prefix", m.TablePrefix),
 			zap.Int("version", migration.Version))
 	}
 
